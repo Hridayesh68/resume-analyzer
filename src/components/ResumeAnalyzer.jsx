@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import UploadPage from '../pages/UploadPage';
-import ResultsPage from '../pages/ResultsPage';
+import UploadPage from '../pages/UploadPage.jsx';
+import ResultsPage from '../pages/ResultsPage.jsx';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 export default function ResumeAnalyzer({ dark }) {

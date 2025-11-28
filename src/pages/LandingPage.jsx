@@ -1,7 +1,7 @@
 import React from "react";
-import Hero from "../components/Hero";
-import Features from "../components/Features";
-import Footer from "../components/Footer";
+import Hero from "../components/Hero.jsx";
+import Features from "../components/Features.jsx";
+import Footer from "../components/Footer.jsx";
 
 export default function LandingPage({ onEnter }) {
   return (

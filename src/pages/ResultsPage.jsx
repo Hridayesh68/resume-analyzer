@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import Scorecard from "../components/Scorecard";
-import SkillChart from "../components/SkillChart";
-import JobRecommendations from "../components/JobRecommendations";
+import Scorecard from "../components/Scorecard.jsx";
+import SkillChart from "../components/SkillChart.jsx";
+import JobRecommendations from "../components/JobRecommendations.jsx";
 
 export default function ResultsPage({ analysis }) {
   const [tab, setTab] = useState("score");
