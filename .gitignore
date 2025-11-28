@@ -1,0 +1,101 @@
+# =========================================================
+# === GLOBAL IGNORE RULES (Node + Python + OS + Editors) ===
+# =========================================================
+
+# ------------------------------
+# Node / React / Vite
+# ------------------------------
+node_modules/
+**/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.cache/
+.vite/
+*.local
+
+# Prevent accidental .env files in frontend
+frontend/.env
+frontend/.env.*
+frontend/.env.local
+frontend/.env.production
+frontend/.env.development
+
+# ------------------------------
+# Python / FastAPI / Backend
+# ------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+*.log
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+backend/venv/
+backend/env/
+
+# Python package build files
+build/
+dist/
+*.egg-info/
+
+# FastAPI temp uploads
+uploaded_files/
+backend/uploaded_files/
+
+# spaCy model download cache
+backend/spacy_cache/
+
+# ------------------------------
+# Secrets / Security
+# ------------------------------
+# encrypted password
+backend/password/encrypted_password.bin
+backend/password/*.bin
+
+# encryption keys
+EMAIL_KEY
+*.key
+*.pem
+
+# dotenv secrets
+.env
+.env.*
+backend/.env
+backend/.env.*
+
+# Gmail or API credentials
+*.token
+*.credentials
+
+# ------------------------------
+# IDE / OS Files (Windows + VSCode)
+# ------------------------------
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Windows files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux temp
+*~
+.cache/
