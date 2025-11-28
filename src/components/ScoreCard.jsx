@@ -1,6 +1,8 @@
 import React from "react";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
+
 import "react-circular-progressbar/dist/styles.css";
+
 
 export default function Scorecard({ analysis }) {
   const score = analysis.overall_score || 0;
