@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Scorecard from "../components/Scorecard.jsx";
+import Scorecard from "../components/ScoreCard.jsx";
 import SkillChart from "../components/SkillChart.jsx";
 import JobRecommendations from "../components/JobRecommendations.jsx";
 
