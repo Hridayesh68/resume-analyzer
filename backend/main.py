@@ -28,6 +28,7 @@ from utils.nlp_utils import (
     normalize_text
 )
 
+
 # ------------------------------------------------------
 # LOAD ENVIRONMENT VARIABLES
 # ------------------------------------------------------

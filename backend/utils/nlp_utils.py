@@ -1,23 +1,17 @@
 # backend/utils/nlp_utils.py
 """
-NLP utilities for resume analysis (spaCy + TF-IDF)
-No transformers, no torch. Uses scikit-learn TF-IDF for job matching.
+Lightweight NLP utilities for resume analysis.
+NO spaCy, NO models, NO transformers.
+Everything uses regex + TF-IDF + heuristics.
 """
 
 import re
-import spacy
-from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Load spaCy model (make sure to run: python -m spacy download en_core_web_sm)
-try:
-    nlp = spacy.load("en_core_web_sm")
-except Exception:
-    print("⚠️  Warning: spaCy model not found. Run: python -m spacy download en_core_web_sm")
-    nlp = None
-
-# Skill set (adjustable)
+# ---------------------------------------
+# COMMON SKILLS LIST
+# ---------------------------------------
 COMMON_SKILLS = [
     "python", "javascript", "java", "c++", "c#", "ruby", "php", "swift", "kotlin",
     "typescript", "go", "rust", "scala", "r", "matlab",
@@ -30,6 +24,9 @@ COMMON_SKILLS = [
     "tableau", "power bi", "excel"
 ]
 
+# ---------------------------------------
+# JOB ROLES
+# ---------------------------------------
 JOB_ROLES = [
     "Data Analyst",
     "Machine Learning Engineer",
@@ -38,122 +35,121 @@ JOB_ROLES = [
     "Backend Developer",
     "DevOps Engineer",
     "Frontend Developer",
-    "Business Intelligence Analyst"
+    "Business Intelligence Analyst",
 ]
 
 
+# ---------------------------------------
+# NORMALIZATION
+# ---------------------------------------
 def normalize_text(text: str) -> str:
-    """Normalize whitespace and return lowercased text for analysis when needed."""
+    """Basic cleanup + whitespace fix."""
     if not text:
         return ""
     return re.sub(r'\s+', ' ', text).strip()
 
 
+# ---------------------------------------
+# ENTITY EXTRACTION (NO SPACY)
+# ---------------------------------------
 def extract_basic_entities(text: str) -> dict:
-    """Extract simple entities: persons, orgs, emails, phones."""
-    if not nlp:
-        return {"persons": [], "organizations": [], "emails": [], "phones": []}
-
-    doc = nlp(text)
+    """Extract emails, phones, and some name-like patterns."""
+    
     emails = re.findall(r'[\w\.-]+@[\w\.-]+\.\w+', text)
-    phones = re.findall(r'(\+?\d[\d\-\s]{7,}\d)', text)
+    phones = re.findall(r'\+?\d[\d\s\-]{8,}\d', text)
 
-    orgs = [ent.text for ent in doc.ents if ent.label_ == "ORG"]
-    persons = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
+    # "Persons" extracted using simple capitalized word heuristics
+    persons = re.findall(r'\b[A-Z][a-z]+\s[A-Z][a-z]+\b', text)
 
-    # dedupe preserving order
-    def dedupe(seq):
-        seen = set()
-        out = []
-        for s in seq:
-            if s not in seen:
-                seen.add(s)
-                out.append(s)
-        return out
+    # ORG using uppercase tokens (e.g., GOOGLE, MICROSOFT)
+    organizations = [
+        w for w in re.findall(r'\b[A-Z][A-Z]+\b', text)
+        if len(w) > 2
+    ]
+
+    # remove duplicates
+    def dedupe(lst):
+        return list(dict.fromkeys(lst))
 
     return {
         "persons": dedupe(persons),
-        "organizations": dedupe(orgs),
+        "organizations": dedupe(organizations),
         "emails": dedupe(emails),
         "phones": dedupe(phones),
     }
 
 
+# ---------------------------------------
+# SKILL EXTRACTION WITHOUT SPACY
+# ---------------------------------------
 def extract_skills(text: str) -> list:
-    """
-    Keyword-based skill extraction.
-    Returns sorted list of {skill, confidence, count}.
-    Confidence scales with occurrences and early appearance.
-    """
+    """Keyword matching with scoring heuristics."""
     text_l = text.lower()
-    skills = []
+    results = []
 
-    for kw in COMMON_SKILLS:
-        count = text_l.count(kw)
+    for skill in COMMON_SKILLS:
+        count = text_l.count(skill)
         if count > 0:
-            # base score + frequency + early-appearance bonus
             base = 40
             freq_bonus = min(30, count * 10)
-            position_bonus = 10 if text_l.find(kw) >= 0 and text_l.find(kw) < 400 else 0
-            score = min(100, base + freq_bonus + position_bonus)
-            skills.append({"skill": kw, "confidence": score, "count": count})
+            early_bonus = 10 if text_l.find(skill) < 300 else 0
+            confidence = min(100, base + freq_bonus + early_bonus)
+            results.append({
+                "skill": skill,
+                "confidence": confidence,
+                "count": count
+            })
 
-    # sort by confidence and frequency
-    skills.sort(key=lambda x: (x["confidence"], x["count"]), reverse=True)
-    return skills
+    results.sort(key=lambda x: (x["confidence"], x["count"]), reverse=True)
+    return results
 
 
+# ---------------------------------------
+# ATS SCORE
+# ---------------------------------------
 def compute_ats_score(skills: list, text: str) -> int:
-    """
-    Compute a simple ATS score (0-100).
-    Composition:
-      - skills coverage (0-50)
-      - contact & education presence (0-20)
-      - length heuristics (0-30)
-    """
-    num_skills = len(skills)
-    skills_component = min(50, int((num_skills / max(1, len(COMMON_SKILLS))) * 50))
+    """Simple ATS score using counts + heuristics."""
+
+    skills_component = min(50, int((len(skills) / len(COMMON_SKILLS)) * 50))
 
     entities = extract_basic_entities(text)
-    contact_bonus = 10 if (entities["emails"] or entities["phones"]) else 0
+    contact = 10 if (entities["emails"] or entities["phones"]) else 0
+    education_kw = ["bachelor", "master", "phd", "b.sc", "m.sc", "mba"]
+    education = 10 if any(k in text.lower() for k in education_kw) else 0
 
-    # simple education detection
-    ed = 10 if any(keyword in text.lower() for keyword in ["bachelor", "master", "phd", "mba", "b.sc", "m.sc"]) else 0
-    contact_education = contact_bonus + ed
-
-    # length score
     words = len(text.split())
     if words >= 400:
-        length_score = 30
+        length = 30
     elif words >= 200:
-        length_score = 15
+        length = 20
     else:
-        length_score = 5
+        length = 10
 
-    total = skills_component + contact_education + length_score
-    return max(0, min(100, int(total)))
+    return min(100, skills_component + contact + education + length)
 
 
-def recommend_jobs_via_embeddings(text: str, job_roles=None, top_k=5) -> list:
-    """
-    Recommend job roles using TF-IDF + cosine similarity.
-    Lightweight and deterministic, no external heavy deps.
-    """
-    job_roles = job_roles or JOB_ROLES
+# ---------------------------------------
+# JOB RECOMMENDATIONS
+# ---------------------------------------
+def recommend_jobs_via_embeddings(text, job_roles=None, top_k=5):
+    """TF-IDF + cosine similarity job role ranking."""
+    roles = job_roles or JOB_ROLES
+    corpus = [text] + roles
 
-    corpus = [text] + job_roles
     try:
         vectorizer = TfidfVectorizer(stop_words="english")
         tfidf = vectorizer.fit_transform(corpus)
-        resume_vec = tfidf[0]
+
+        resume_vec = tfidf[0:1]
         role_vecs = tfidf[1:]
+
         sims = cosine_similarity(resume_vec, role_vecs).flatten()
-        results = []
-        for role, score in zip(job_roles, sims):
-            results.append({"role": role, "score": int(round(float(score) * 100))})
-        results.sort(key=lambda x: x["score"], reverse=True)
-        return results[:top_k]
-    except Exception as e:
-        print("⚠️ TF-IDF recommendation error:", e)
-        # fallback
-        return [{"role": r, "score": 60} for r in job_roles][:top_k]
+        results = [
+            {"role": r, "score": int(s * 100)}
+            for r, s in zip(roles, sims)
+        ]
+
+        return sorted(results, key=lambda x: x["score"], reverse=True)[:top_k]
+
+    except Exception:
+        return [{"role": r, "score": 50} for r in roles][:top_k]
