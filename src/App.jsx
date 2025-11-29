@@ -25,26 +25,22 @@ function App() {
     setSending(true);
     setStatus("");
 
-    try {
-      const res = await fetch("http://127.0.0.1:8000/send_email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+   try {
+  const res = await fetch("https://resume-analyzer-g4sr.onrender.com/send_email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(formData)
+  });
 
-      if (res.ok) {
-        setStatus("Message sent successfully!");
-        setFormData({ name: "", email: "", message: "" });
-      } else {
-        setStatus("Failed to send message.");
-      }
-    } catch (err) {
-      console.error("Email error:", err);
-      setStatus("Error sending message.");
-    }
+  const data = await res.json();
+  console.log("Email response:", data);
 
-    setSending(false);
-  };
+} catch (error) {
+  console.error("Email error:", error);
+}
+
 
   return (
     <div className={dark ? "dark" : ""}>
