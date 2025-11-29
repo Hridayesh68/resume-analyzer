@@ -25,22 +25,29 @@ function App() {
     setSending(true);
     setStatus("");
 
-   try {
-  const res = await fetch("https://resume-analyzer-g4sr.onrender.com/send_email", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(formData)
-  });
+    try {
+      const res = await fetch("https://resume-analyzer-g4sr.onrender.com/send_email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
 
-  const data = await res.json();
-  console.log("Email response:", data);
+      const data = await res.json();
+      console.log("Email response:", data);
 
-} catch (error) {
-  console.error("Email error:", error);
-}
+      if (data.success) {
+        setStatus("Your message was sent successfully!");
+      } else {
+        setStatus("Failed to send message.");
+      }
 
+    } catch (error) {
+      console.error("Email error:", error);
+      setStatus("An error occurred. Try again.");
+    }
+
+    setSending(false);
+  }; // <-- ✅ FIX: Close function properly
 
   return (
     <div className={dark ? "dark" : ""}>
@@ -156,10 +163,8 @@ function App() {
                 <p className="text-sm text-gray-500">© 2024 Elevate Resume. All rights reserved.</p>
               </div>
             </footer>
-
           </>
         )}
-
       </div>
     </div>
   );
