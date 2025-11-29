@@ -7,6 +7,7 @@ Secure Gmail Email System + Resume Analysis
 import os
 import shutil
 import uuid
+import re
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -23,11 +24,9 @@ from utils.text_extraction import extract_text_from_file
 from utils.nlp_utils import (
     extract_skills,
     extract_basic_entities,
-    compute_ats_score,
     recommend_jobs_via_embeddings,
     normalize_text
 )
-
 
 # ------------------------------------------------------
 # LOAD ENVIRONMENT VARIABLES
@@ -35,7 +34,6 @@ from utils.nlp_utils import (
 load_dotenv()
 
 YOUR_EMAIL = "hridayeshdebsarma6@gmail.com"
-
 
 # ------------------------------------------------------
 # DECRYPT GMAIL APP PASSWORD
@@ -88,6 +86,150 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 print("🔥 USING NLP BACKEND (spaCy + TF-IDF) 🔥")
 print("RUNNING FROM:", os.path.abspath(__file__))
+
+
+# ------------------------------------------------------
+# ATS SCORING AUTOMATION
+# ------------------------------------------------------
+def _has_contact(entities: dict) -> float:
+    """Return contact presence score: 1.0 if email+phone, 0.5 if one, 0 otherwise."""
+    emails = entities.get("emails", []) if isinstance(entities, dict) else []
+    phones = entities.get("phones", []) if isinstance(entities, dict) else []
+    has_email = len(emails) > 0
+    has_phone = len(phones) > 0
+    if has_email and has_phone:
+        return 1.0
+    if has_email or has_phone:
+        return 0.5
+    return 0.0
+
+
+def _education_score(text: str) -> float:
+    """Simple education matching heuristics (bachelor/master/phd -> 1.0, diploma -> 0.6, none -> 0)."""
+    t = text.lower()
+    if re.search(r'\b(phd|doctorate)\b', t):
+        return 1.0
+    if re.search(r'\b(master|msc|m\.sc|mtech|m\.tech|mba)\b', t):
+        return 1.0
+    if re.search(r'\b(bachelor|bsc|b\.sc|btech|b\.tech|bachelor of technology|bachelor of science)\b', t):
+        return 1.0
+    if re.search(r'\b(diploma|associate|certificate)\b', t):
+        return 0.6
+    return 0.0
+
+
+def _formatting_quality(text: str) -> float:
+    """Heuristic formatting score (0-1). Checks length, presence of many short lines, and non-printables."""
+    if not text:
+        return 0.0
+
+    # Remove long whitespace
+    clean = re.sub(r'\s+', ' ', text).strip()
+    words = clean.split()
+    words_count = len(words)
+
+    # Basic length heuristic
+    length_score = 1.0 if words_count >= 300 else (0.6 if words_count >= 150 else 0.3)
+
+    # Check for many short lines (bad formatting) - penalize if too many short lines
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    short_lines = sum(1 for ln in lines if len(ln.split()) <= 3)
+    if lines:
+        short_ratio = short_lines / len(lines)
+    else:
+        short_ratio = 0.0
+
+    short_penalty = max(0.0, 1.0 - short_ratio * 1.5)  # if many short lines, reduce
+
+    # Check non-printable / weird characters
+    nonprintables = len(re.findall(r'[^\x00-\x7F]', text))
+    nonprint_penalty = 1.0 if nonprintables == 0 else max(0.0, 1.0 - (nonprintables / 50.0))
+
+    score = length_score * 0.6 + short_penalty * 0.25 + nonprint_penalty * 0.15
+    return max(0.0, min(1.0, score))
+
+
+def _keyword_density_score(skills_list: list, text: str) -> float:
+    """
+    Keyword density heuristic:
+    - number of unique skills found vs expected (we treat top 10 skills as ideal).
+    - scaled to 0-1
+    """
+    if not skills_list:
+        return 0.0
+    unique_skills = { (s.get("skill") if isinstance(s, dict) else str(s)).lower() for s in skills_list }
+    found = len(unique_skills)
+    # ideal target is 10 unique relevant skills
+    return min(1.0, found / 10.0)
+
+
+def _skill_match_score(skills_list: list) -> float:
+    """
+    Skill match based on avg confidence (if provided) or presence.
+    Expect skills_list to be a list of dicts: [{"skill":"python","confidence":80}, ...]
+    """
+    if not skills_list:
+        return 0.0
+
+    confidences = []
+    for s in skills_list:
+        if isinstance(s, dict):
+            c = s.get("confidence")
+            if isinstance(c, (int, float)):
+                confidences.append(max(0.0, min(100.0, float(c))))
+            else:
+                # if confidence not present, assume moderate (60)
+                confidences.append(60.0)
+        else:
+            confidences.append(60.0)
+
+    avg_conf = sum(confidences) / len(confidences)
+    return max(0.0, min(1.0, avg_conf / 100.0))
+
+
+def calculate_ats_score(skills_list: list, text: str, entities: dict = None) -> tuple:
+    """
+    Returns (ats_score_int, breakdown_dict)
+    breakdown values are floats in [0,1].
+    Weights:
+      skill_match: 50%
+      keyword_density: 20%
+      contact: 10%
+      education: 10%
+      formatting: 10%
+    """
+    entities = entities or {}
+    # Sub-scores 0..1
+    skill_match = _skill_match_score(skills_list)
+    keyword_density = _keyword_density_score(skills_list, text)
+    contact = _has_contact(entities)
+    education = _education_score(text)
+    formatting = _formatting_quality(text)
+
+    # weights
+    w_skill = 0.50
+    w_keyword = 0.20
+    w_contact = 0.10
+    w_edu = 0.10
+    w_format = 0.10
+
+    overall = (skill_match * w_skill +
+               keyword_density * w_keyword +
+               contact * w_contact +
+               education * w_edu +
+               formatting * w_format)
+
+    ats_score = int(round(overall * 100))
+
+    breakdown = {
+        "skill_match": round(skill_match, 2),
+        "keyword_coverage": round(keyword_density, 2),
+        "contact_score": round(contact, 2),
+        "education_score": round(education, 2),
+        "formatting_score": round(formatting, 2),
+    }
+
+    return ats_score, breakdown
 
 
 # ------------------------------------------------------
@@ -168,21 +310,27 @@ async def analyze_resume(file: UploadFile = File(...)):
         # RUN NLP
         entities = extract_basic_entities(raw_text)
         skills = extract_skills(raw_text)
-        ats_score = compute_ats_score(skills, raw_text)
+        # 自动化 ATS score calculation
+        ats_score, ats_breakdown = calculate_ats_score(skills, raw_text, entities)
+
+        # Job recommendations (existing method)
         recommendations = recommend_jobs_via_embeddings(raw_text)
 
         os.remove(temp_path)
 
         response = {
             "overall_score": ats_score,
+            "ats_score": ats_score,
+            "ats_breakdown": ats_breakdown,
             "key_metrics": {
                 "keyword_density": round(len(skills) / max(1, len(skills) + 10), 2),
-                "readability_grade": 10,
-                "formatting_clarity": 0.7,
+                # readability removed per earlier request
+                "formatting_clarity": round(ats_breakdown.get("formatting_score", 0), 2),
             },
             "skills_proficiency": skills,
             "job_recommendations": recommendations,
             "entities": entities,
+            "summary": "",  # placeholder — can be filled by Gemini if/when used
         }
 
         print("\n✅ NLP RESULT SENT TO FRONTEND")

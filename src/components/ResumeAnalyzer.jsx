@@ -9,89 +9,88 @@ export default function ResumeAnalyzer({ dark }) {
   const [analysis, setAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // ⭐ 100% FIX: Remove unwanted JSX fields from backend JSON
+  function deepSanitize(obj) {
+    if (Array.isArray(obj)) return obj.map(deepSanitize);
+
+    if (obj && typeof obj === "object") {
+      const cleaned = {};
+      for (const key in obj) {
+        if (key.toLowerCase() === "jsx") continue; // remove illegal JSX prop
+        cleaned[key] = deepSanitize(obj[key]);
+      }
+      return cleaned;
+    }
+
+    return obj;
+  }
+
+  // ⭐ Normalize backend response → ALWAYS clean & compatible
+ function transformBackendData(data) {
+  const clean = deepSanitize(data);
+
+  const score =
+    Number(clean.ats_score) ||
+    Number(clean.overall_score) ||
+    0;
+
+  return {
+    ats_score: score,
+    overall_score: score,
+
+    key_metrics: {
+      keyword_density: clean.key_metrics?.keyword_density || 0.5,
+      formatting_clarity: clean.key_metrics?.formatting_clarity || 0.8
+    },
+
+    skills_proficiency: Array.isArray(clean.skills_proficiency)
+      ? clean.skills_proficiency.map(s => ({
+          skill: String(s.skill || s.name || s),
+          confidence: s.confidence || 75
+        }))
+      : [],
+
+    job_recommendations: Array.isArray(clean.job_recommendations)
+      ? clean.job_recommendations.map(role => ({
+          role: String(role.role || role),
+          score: role.score || 80,
+          reason: "Good match based on your skills"
+        }))
+      : [],
+
+    entities: clean.entities || {},
+    ats_breakdown: clean.ats_breakdown || {},
+    summary: clean.summary || ""
+  };
+}
+
+
   const handleFileSelect = async (file) => {
     setCurrentFile(file);
     setIsAnalyzing(true);
 
     try {
-      // Create FormData for file upload
       const formData = new FormData();
       formData.append('file', file);
 
-      // Call your backend API
       const response = await fetch('http://localhost:8000/analyze_resume', {
         method: 'POST',
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error(`Backend error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Backend error: ${response.status}`);
 
-      const data = await response.json();
-      console.log('✅ Received analysis from backend:', data);
+      const raw = await response.json();
+      console.log("📥 RAW Backend Data:", raw);
 
-      // Transform backend response to match frontend format
-      const transformedAnalysis = {
-        overall_score: data.overall_score || 0,
-        key_metrics: {
-          keyword_density: data.key_metrics?.keyword_density || 0,
-          readability_grade: data.key_metrics?.readability_grade || 0,
-          formatting_clarity: data.key_metrics?.formatting_clarity || 0
-        },
-        skills_proficiency: (data.skills_proficiency || []).map(skill => ({
-          skill: skill.skill || skill.name,
-          confidence: skill.confidence || skill.level || 0
-        })),
-        job_recommendations: (data.job_recommendations || []).map(job => ({
-          role: job.role || job.title,
-          score: job.score || 0,
-          reason: job.reason || 'Good match based on your skills and experience.'
-        }))
-      };
+      const transformed = transformBackendData(raw);
+      console.log("✨ Transformed Clean Analysis:", transformed);
 
-      setAnalysis(transformedAnalysis);
+      setAnalysis(transformed);
+
     } catch (error) {
       console.error('❌ Error analyzing resume:', error);
-      
-      // Show error message to user
-      alert(`Failed to analyze resume: ${error.message}\n\nMake sure the backend is running on http://localhost:8000`);
-      
-      // Fallback to mock data for testing
-      const mockAnalysis = {
-        overall_score: 84,
-        key_metrics: {
-          keyword_density: 0.72,
-          readability_grade: 68,
-          formatting_clarity: 0.85
-        },
-        skills_proficiency: [
-          { skill: 'JavaScript', confidence: 90 },
-          { skill: 'React', confidence: 85 },
-          { skill: 'Python', confidence: 75 },
-          { skill: 'Node.js', confidence: 80 },
-          { skill: 'SQL', confidence: 70 },
-          { skill: 'Git', confidence: 88 }
-        ],
-        job_recommendations: [
-          {
-            role: 'Senior Frontend Developer',
-            score: 92,
-            reason: 'Strong match based on your React and JavaScript expertise.'
-          },
-          {
-            role: 'Full Stack Developer',
-            score: 85,
-            reason: 'Your backend skills complement your frontend knowledge.'
-          },
-          {
-            role: 'Software Engineer',
-            score: 78,
-            reason: 'General software engineering role where your diverse skill set would be valuable.'
-          }
-        ]
-      };
-      setAnalysis(mockAnalysis);
+      alert(`Failed to analyze resume: ${error.message}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -117,12 +116,12 @@ export default function ResumeAnalyzer({ dark }) {
               <motion.div
                 animate={{
                   scale: [1, 1.2, 1],
-                  rotate: [0, 180, 360]
+                  rotate: [0, 180, 360],
                 }}
                 transition={{
                   duration: 2,
                   repeat: Infinity,
-                  ease: "easeInOut"
+                  ease: "easeInOut",
                 }}
                 className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl"
               />
@@ -132,24 +131,6 @@ export default function ResumeAnalyzer({ dark }) {
               <p className="text-gray-600 dark:text-gray-400">
                 AI is processing your document...
               </p>
-              <motion.div
-                className="mt-6 flex gap-2 justify-center"
-              >
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    animate={{
-                      y: [0, -20, 0],
-                    }}
-                    transition={{
-                      duration: 0.6,
-                      repeat: Infinity,
-                      delay: i * 0.2
-                    }}
-                    className="w-3 h-3 bg-indigo-600 rounded-full"
-                  />
-                ))}
-              </motion.div>
             </div>
           </motion.div>
         )}
@@ -173,11 +154,7 @@ export default function ResumeAnalyzer({ dark }) {
           <UploadPage onFileSelect={handleFileSelect} />
         </motion.div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
           <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-20">
             <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -190,17 +167,15 @@ export default function ResumeAnalyzer({ dark }) {
                 </button>
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Analyzing: <span className="font-semibold text-gray-900 dark:text-white">{currentFile?.name}</span>
+                  Analyzing:{" "}
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {currentFile?.name}
+                  </span>
                 </div>
               </div>
-              <button
-                onClick={() => alert('Export feature coming soon!')}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium"
-              >
-                Export Report
-              </button>
             </div>
           </div>
+
           <ResultsPage analysis={analysis} />
         </motion.div>
       )}
