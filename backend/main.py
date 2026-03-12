@@ -21,19 +21,26 @@ from email.mime.text import MIMEText
 
 # NLP imports
 from utils.text_extraction import extract_text_from_file
-from utils.nlp_utils import (
-    extract_skills,
-    extract_basic_entities,
-    recommend_jobs_via_embeddings,
-    normalize_text
-)
+from utils.nlp_utils import normalize_text
+import google.generativeai as genai
+import json
+import requests
+import traceback
 
 # ------------------------------------------------------
 # LOAD ENVIRONMENT VARIABLES
 # ------------------------------------------------------
 load_dotenv()
 
+# Setup logging to file
+import logging
+logging.basicConfig(filename='server_errors.log', level=logging.ERROR, 
+                    format='%(asctime)s %(levelname)s:%(message)s')
+
 YOUR_EMAIL = os.getenv("Email")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # ------------------------------------------------------
 # DECRYPT GMAIL APP PASSWORD
@@ -291,15 +298,18 @@ async def analyze_resume(file: UploadFile = File(...)):
         print("📥 Resume received for analysis")
         print("=====================================")
 
-        temp_filename = f"{uuid.uuid4()}_{file.filename}"
+        # Sanitize filename
+        safe_filename = re.sub(r'[^a-zA-Z0-9.-]', '_', file.filename)
+        temp_filename = f"{uuid.uuid4()}_{safe_filename}"
         temp_path = os.path.join(UPLOAD_DIR, temp_filename)
 
+        print(f"📂 Saving file to: {temp_path}")
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        print("📄 Saved at:", temp_path)
-
+        print("📄 Extracting text...")
         raw_text = extract_text_from_file(temp_path, file.filename)
+        print(f"✨ Extraction complete. Length: {len(raw_text)}")
         raw_text = normalize_text(raw_text)
 
         if not raw_text.strip():
@@ -309,38 +319,107 @@ async def analyze_resume(file: UploadFile = File(...)):
         print("\n📘 Extracted Resume Preview:")
         print(raw_text[:300], "...\n")
 
-        # RUN NLP
-        entities = extract_basic_entities(raw_text)
-        skills = extract_skills(raw_text)
-        # 自动化 ATS score calculation
-        ats_score, ats_breakdown = calculate_ats_score(skills, raw_text, entities)
-
-        # Job recommendations (existing method)
-        recommendations = recommend_jobs_via_embeddings(raw_text)
-
         os.remove(temp_path)
 
-        response = {
-            "overall_score": ats_score,
-            "ats_score": ats_score,
-            "ats_breakdown": ats_breakdown,
-            "key_metrics": {
-                "keyword_density": round(len(skills) / max(1, len(skills) + 10), 2),
-                # readability removed per earlier request
-                "formatting_clarity": round(ats_breakdown.get("formatting_score", 0), 2),
-            },
-            "skills_proficiency": skills,
-            "job_recommendations": recommendations,
-            "entities": entities,
-            "summary": "",  # placeholder — can be filled by Gemini if/when used
+        if not GEMINI_API_KEY:
+            raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured in the backend .env file.")
+
+        print("\n🤖 Calling Gemini API...")
+        prompt = f"""
+        Analyze the following resume text and provide a structured JSON response. 
+        The JSON must adhere to the following structure exactly:
+        {{
+            "overall_score": <int 0-100 ATS score>,
+            "ats_score": <int 0-100 ATS score>,
+            "ats_breakdown": {{
+                "skill_match": <float 0-1>,
+                "keyword_coverage": <float 0-1>,
+                "contact_score": <float 0-1>,
+                "education_score": <float 0-1>,
+                "formatting_score": <float 0-1>
+            }},
+            "key_metrics": {{
+                "keyword_density": <float 0-1>,
+                "formatting_clarity": <float 0-1>
+            }},
+            "skills_proficiency": [
+                {{"skill": "<skill_name>", "confidence": <int 0-100>}}
+            ],
+            "job_recommendations": [
+                {{"role": "<role_name>", "score": <int 0-100>, "reason": "<short reason>"}}
+            ],
+            "entities": {{
+                "persons": ["<name>"],
+                "organizations": ["<org>"],
+                "emails": ["<email>"],
+                "phones": ["<phone>"]
+            }},
+            "summary": "<A 2-3 sentence personalized summary/feedback for the candidate on how to improve>"
+        }}
+
+        Resume Text:
+        {raw_text}
+        """
+
+        if not GEMINI_API_KEY:
+             raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured.")
+
+        print(f"📝 Raw Text Length: {len(raw_text)} characters")
+        print("\n🚀 Sending to Gemini (REST API)...")
+        URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }],
+            "generationConfig": {
+                "responseMimeType": "application/json"
+            }
         }
 
-        print("\n✅ NLP RESULT SENT TO FRONTEND")
+        try:
+            api_response = requests.post(
+                URL,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=30
+            )
+            
+            if api_response.status_code != 200:
+                error_detail = api_response.text
+                logging.error(f"Gemini API Error {api_response.status_code}: {error_detail}")
+                raise Exception(f"Gemini API returned {api_response.status_code}")
+
+            result_json = api_response.json()
+            
+            # Extract text from the nested structure
+            try:
+                raw_response = result_json['candidates'][0]['content']['parts'][0]['text']
+            except (KeyError, IndexError):
+                logging.error(f"Unexpected Gemini Response Structure: {result_json}")
+                raise Exception("Could not parse Gemini response parts.")
+
+            raw_response = raw_response.strip()
+            if raw_response.startswith("```"):
+                raw_response = re.sub(r'^```(?:json)?\s*', '', raw_response)
+                raw_response = re.sub(r'\s*```$', '', raw_response)
+            
+            response = json.loads(raw_response)
+        except Exception as e:
+            error_msg = traceback.format_exc()
+            logging.error(f"Gemini API/Parsing Error: {error_msg}")
+            print(error_msg)
+            raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+
+        print("\n✅ GEMINI RESULT SENT TO FRONTEND")
         return response
 
     except Exception as e:
-        print("❌ ANALYSIS ERROR:", str(e))
-        raise HTTPException(status_code=500, detail="Internal server error")
+        import traceback
+        error_msg = traceback.format_exc()
+        logging.error(f"General Analysis Error: {error_msg}")
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
 
 
 # ------------------------------------------------------

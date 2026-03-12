@@ -11,18 +11,15 @@ export default function ResumeAnalyzer({ dark }) {
 
   // ⭐ 100% FIX: Remove unwanted JSX fields from backend JSON
   function deepSanitize(obj) {
+    if (obj === null || typeof obj !== "object") return obj;
     if (Array.isArray(obj)) return obj.map(deepSanitize);
 
-    if (obj && typeof obj === "object") {
-      const cleaned = {};
-      for (const key in obj) {
-        if (key.toLowerCase() === "jsx") continue; // remove illegal JSX prop
-        cleaned[key] = deepSanitize(obj[key]);
-      }
-      return cleaned;
+    const cleaned = {};
+    for (const key in obj) {
+      if (key.toLowerCase() === "jsx") continue;
+      cleaned[key] = deepSanitize(obj[key]);
     }
-
-    return obj;
+    return cleaned;
   }
 
   // ⭐ Normalize backend response → ALWAYS clean & compatible
@@ -73,14 +70,17 @@ export default function ResumeAnalyzer({ dark }) {
       const formData = new FormData();
       formData.append('file', file);
 
- const response = await fetch("https://resume-analyzer-g4sr.onrender.com/analyze_resume", {
+ const response = await fetch("http://localhost:8000/analyze_resume", {
   method: "POST",
   body: formData
 });
 
 
 
-      if (!response.ok) throw new Error(`Backend error: ${response.status}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || `Backend error: ${response.status}`);
+      }
 
       const raw = await response.json();
       console.log("📥 RAW Backend Data:", raw);

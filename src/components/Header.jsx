@@ -69,7 +69,7 @@ export default function Header({ dark, setDark, onEnterApp }) {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fade-in {
           from {
             opacity: 0;
