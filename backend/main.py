@@ -33,7 +33,7 @@ from utils.nlp_utils import (
 # ------------------------------------------------------
 load_dotenv()
 
-YOUR_EMAIL = "hridayeshdebsarma6@gmail.com"
+YOUR_EMAIL = os.getenv("Email")
 
 # ------------------------------------------------------
 # DECRYPT GMAIL APP PASSWORD
@@ -238,27 +238,29 @@ def calculate_ats_score(skills_list: list, text: str, entities: dict = None) -> 
 @app.post("/send_email")
 def send_email(data: ContactForm):
     try:
-        APP_PASSWORD = get_decrypted_gmail_password()
+        APP_PASSWORD = os.getenv("App_password")
 
         msg = MIMEMultipart()
-        msg["From"] = YOUR_EMAIL  # Always FROM you
-        msg["To"] = YOUR_EMAIL    # Always TO you
+        msg["From"] = YOUR_EMAIL
+        msg["To"] = YOUR_EMAIL
         msg["Subject"] = f"New Contact Form Message from {data.name}"
 
         body = f"""
-📩 New message received from ElevateCV Contact Form
+New message from ElevateCV Contact Form:
 
-👤 Name: {data.name}
-📧 Email: {data.email}
+Name: {data.name}
+Email: {data.email}
 
-📝 Message:
+Message:
 {data.message}
         """
 
         msg.attach(MIMEText(body, "plain"))
 
-        server = smtplib.SMTP("smtp.gmail.com", 587)
+        # Add timeout so endpoint doesn't freeze
+        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
         server.starttls()
+
         server.login(YOUR_EMAIL, APP_PASSWORD)
         server.sendmail(YOUR_EMAIL, YOUR_EMAIL, msg.as_string())
         server.quit()
@@ -267,7 +269,7 @@ def send_email(data: ContactForm):
 
     except Exception as e:
         print("Email error:", e)
-        return {"success": False, "message": "Failed to send email"}
+        return {"success": False, "message": f"Failed to send email: {str(e)}"}
 
 
 # ------------------------------------------------------
