@@ -1,0 +1,7 @@
+John Doe
+Python Developer
+5 years of experience at TechCorp.
+Skills: Python, JavaScript, React, FastAPI.
+Email: john.doe@example.com
+Phone: 123-456-7890
+Degree: Bachelor of Science in Computer Science
