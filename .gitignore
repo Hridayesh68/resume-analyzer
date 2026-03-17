@@ -99,3 +99,7 @@ Desktop.ini
 # Linux temp
 *~
 .cache/
+# Python virtual environment
+backend/.venv_win/
+.venv/
+venv/

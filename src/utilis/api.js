@@ -1,1 +1,1 @@
-axios.get("http://localhost:8000/results")
+axios.get("https://resume-analyzer-g4sr.onrender.com/results")
