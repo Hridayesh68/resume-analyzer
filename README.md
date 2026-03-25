@@ -1,18 +1,106 @@
-# React + Vite
+# 📄 Resume Analyzer 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A smart Resume Analyzer web application that evaluates resumes, extracts key information, and provides insights such as ATS score, keyword matching, and improvement suggestions.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🔍 Features
 
-## React Compiler
+- ✅ Upload and analyze resumes (PDF/DOCX)
+- 📊 ATS Score calculation
+- 🧠 Keyword extraction and matching
+- 📌 Skills, education, and experience parsing
+- 🎯 Job-role based recommendations
+- ⚡ Fast and user-friendly UI
+- 📈 Resume improvement suggestions
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+---
 
-Note: This will impact Vite dev & build performances.
+## 🛠️ Tech Stack
 
-## Expanding the ESLint configuration
+### Frontend
+- HTML, CSS, JavaScript
+- React.js (optional if used)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Backend
+- Python (Flask / FastAPI / Django)
+
+### Libraries
+- `spaCy` / `NLTK` – NLP processing  
+- `PyPDF2` / `pdfplumber` – Resume parsing  
+- `scikit-learn` – Keyword matching / scoring  
+- `pandas` – Data handling  
+
+---
+
+## 📁 Project Structure
+
+
+resume-analyzer/
+│
+├── frontend/ # UI files
+├── backend/ # Server-side logic
+├── models/ # ML/NLP models
+├── uploads/ # Uploaded resumes
+├── utils/ # Helper functions
+├── app.py # Main application
+└── requirements.txt # Dependencies
+
+
+---
+
+## ⚙️ Installation & Setup
+
+### 1️⃣ Clone the repository
+```bash
+git clone https://github.com/your-username/resume-analyzer.git
+cd resume-analyzer
+2️⃣ Create virtual environment
+python -m venv venv
+source venv/bin/activate   # Linux / WSL
+venv\Scripts\activate      # Windows
+3️⃣ Install dependencies
+pip install -r requirements.txt
+4️⃣ Run the application
+python app.py
+5️⃣ Open in browser
+http://localhost:5000
+📊 How It Works
+User uploads a resume
+System extracts text from file
+NLP processes the content
+Keywords are matched with job roles
+ATS score is generated
+Suggestions are provided
+🧪 Example Use Cases
+🎓 Students improving resumes
+💼 Job seekers optimizing for ATS
+🏢 Recruiters screening candidates
+📊 Career guidance platforms
+🚀 Future Improvements
+🔹 AI-based resume rewriting
+🔹 Integration with LinkedIn APIs
+🔹 Real-time job matching
+🔹 Dashboard analytics
+🔹 Multi-language support
+🤝 Contributing
+
+Contributions are welcome!
+
+Fork the repo
+Create a new branch
+Make your changes
+Submit a pull request
+📜 License
+
+This project is licensed under the MIT License.
+
+👨‍💻 Author
+
+Hridayesh Debsarma
+
+GitHub: https://github.com/your-username
+LinkedIn: https://linkedin.com/in/your-profile
+⭐ Show Your Support
+
+If you like this project, please ⭐ the repository!
