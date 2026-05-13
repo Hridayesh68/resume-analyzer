@@ -20,10 +20,10 @@ A smart Resume Analyzer web application that evaluates resumes, extracts key inf
 
 ### Frontend
 - HTML, CSS, JavaScript
-- React.js (optional if used)
+- React.js 
 
 ### Backend
-- Python (Flask / FastAPI / Django)
+- Python (FastAPI)
 
 ### Libraries
 - `spaCy` / `NLTK` – NLP processing  
@@ -91,16 +91,13 @@ Fork the repo
 Create a new branch
 Make your changes
 Submit a pull request
-📜 License
-
-This project is licensed under the MIT License.
 
 👨‍💻 Author
 
 Hridayesh Debsarma
 
-GitHub: https://github.com/your-username
-LinkedIn: https://linkedin.com/in/your-profile
+GitHub: https://github.com/hridayesh68
+LinkedIn: https://linkedin.com/in/hridayeshdebsarma
 ⭐ Show Your Support
 
 If you like this project, please ⭐ the repository!
