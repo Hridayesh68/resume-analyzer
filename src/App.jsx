@@ -26,7 +26,8 @@ function App() {
     setStatus("");
 
     try {
-      const res = await fetch("https://resume-analyzer-g4sr.onrender.com/send_email", {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || "https://resume-analyzer-g4sr.onrender.com";
+      const res = await fetch(`${apiBaseUrl}/send_email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)

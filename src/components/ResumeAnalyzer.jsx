@@ -70,10 +70,11 @@ export default function ResumeAnalyzer({ dark }) {
       const formData = new FormData();
       formData.append('file', file);
 
- const response = await fetch("https://resume-analyzer-g4sr.onrender.com/analyze_resume", {
-  method: "POST",
-  body: formData
-});
+      const apiBaseUrl = import.meta.env.VITE_API_URL || "https://resume-analyzer-g4sr.onrender.com";
+      const response = await fetch(`${apiBaseUrl}/analyze_resume`, {
+        method: "POST",
+        body: formData
+      });
 
 
 
