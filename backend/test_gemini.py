@@ -10,7 +10,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 def test_gemini():
     try:
-        model = genai.GenerativeModel("models/gemini-1.5-flash-latest", generation_config={"response_mime_type": "application/json"})
+        model = genai.GenerativeModel("models/gemini-2.5-flash", generation_config={"response_mime_type": "application/json"})
         prompt = "Analyze this fake resume text and return JSON: 'John Doe, Python Developer, 5 years experience at Google. Skill: Python, React.'"
         
         print("Sending request to Gemini...")

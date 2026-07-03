@@ -103,3 +103,4 @@ Desktop.ini
 backend/.venv_win/
 .venv/
 venv/
+.vercel
